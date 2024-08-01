@@ -1,34 +1,84 @@
-import {useState, useContext, ChangeEvent, MouseEvent, useEffect} from 'react'
-import {useParams, useNavigate} from 'react-router-dom'
-import {EntryContext} from '../utilities/globalContext'
-import {Entry, EntryContextType} from '../@types/context'
+import { FormEvent, useContext, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-export default function EditEntry(){
-    const {id} = useParams()
-    const emptyEntry: Entry = {title: "", description: "",created_at: new Date()}
+import { Entry, EntryContextType } from "../@types/context";
+import { EntryContext } from "../contexts/EntryContext";
+import dateToDefaultValueString from "../utilities/dateToDefaultValueString";
 
-    const { updateEntry, entries } = useContext(EntryContext) as EntryContextType
-    const [newEntry,setNewEntry] = useState<Entry>(emptyEntry)
+const EditEntry: React.FC = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { updateEntry, entries, isLoading } = useContext(EntryContext) as EntryContextType;
+  const [previousEntry, setPreviousEntry] = useState<Entry | null>(null);
 
-    useEffect(() =>{
-        const entry = entries.filter(entry=> entry.id == id)[0]
-        setNewEntry(entry)
-    },[])
-    const handleInputChange = (event: ChangeEvent<HTMLInputElement|HTMLTextAreaElement>) => {
-        setNewEntry({
-            ...newEntry,
-            [event.target.name] : event.target.value
-        })
+  useEffect(() => {
+    if (!isLoading) {
+      const entry = entries.filter((entry) => entry.id == id)[0];
+      setPreviousEntry(entry);
     }
-    const handleSend = (e: MouseEvent<HTMLButtonElement>) => {
-        updateEntry(id as string,newEntry)
-    }
-    return(
-        <section className="flex justify-center flex-col w-fit ml-auto mr-auto mt-10 gap-5 bg-gray-300 p-8 rounded-md">
-            <input className="p-3 rounded-md" type="text" placeholder="Title" name="title" value={newEntry.title} onChange={handleInputChange}/>
-            <textarea className="p-3 rounded-md" placeholder="Description" name="description" value={newEntry.description} onChange={handleInputChange}/>
-            <input className="p-3 rounded-md" type="date" name="created_at" value={(new Date(newEntry.created_at)).toISOString().split('T')[0]} onChange={handleInputChange}/>
-            <button onClick={(e) => {handleSend(e)}} className="bg-blue-400 hover:bg-blue-600 font-semibold text-white p-3 rounded-md">Update</button>
-        </section>
+  }, [entries, isLoading, id]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.target as HTMLFormElement);
+    const newEntry: Entry = {
+      id: previousEntry?.id,
+      title: formData.get("title") as string,
+      description: formData.get("description") as string,
+      created_at: previousEntry?.created_at,
+      scheduled_for: new Date(formData.get("scheduled_for") as string),
+    };
+
+    const entryAdded = await updateEntry(id as string, newEntry);
+    if (entryAdded) {
+      navigate("/");
+    } else alert("Entry could not be saved correctly.");
+  };
+
+  return (
+    previousEntry && (
+      <section className="flex flex-col w-fit ml-auto mr-auto mt-10 gap-5 bg-gray-300 dark:bg-[#282828] rounded-md">
+        <p className="text-xl px-8 pt-4">Edit entry details</p>
+        <form
+          className="flex justify-center flex-col w-fit ml-auto mr-auto gap-5 bg-gray-300 dark:bg-[#282828] px-8 pb-8 rounded-md"
+          onSubmit={(event) => {
+            handleSubmit(event);
+          }}
+        >
+          <input
+            className="p-3 rounded-md dark:bg-[#282828] dark:border-solid dark:border-2 dark:border-[#35383f] text-black dark:text-white"
+            type="text"
+            placeholder="Title"
+            name="title"
+            defaultValue={previousEntry.title}
+            required
+          />
+          <textarea
+            className="p-3 rounded-md dark:bg-[#282828] dark:border-solid dark:border-2 dark:border-[#35383f] text-black dark:text-white"
+            placeholder="Description"
+            name="description"
+            defaultValue={previousEntry.description}
+            required
+          />
+          <label className="text-sm mb-[-1rem]" htmlFor="scheduled_for">
+            Scheduled Date:
+          </label>
+          <input
+            className="p-3 rounded-md dark:bg-[#282828] dark:border-solid dark:border-2 dark:border-[#35383f] text-black dark:text-white"
+            type="date"
+            name="scheduled_for"
+            defaultValue={dateToDefaultValueString(new Date(previousEntry.scheduled_for))}
+            required
+          />
+          <input
+            className="bg-blue-400 hover:bg-blue-600 font-semibold text-white p-3 rounded-md cursor-pointer"
+            type="submit"
+            value="Edit"
+          />
+        </form>
+      </section>
     )
-}
+  );
+};
+
+export default EditEntry;
